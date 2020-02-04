@@ -1,0 +1,78 @@
+#使用launch文件，可以同时启动多个ros节点，包括master节点，所以这样只要一个roslaunch，就可以启动roscore和多个节点程序。
+<launch>#指roslaunch语句的开始和结束。
+  <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
+  <arg name="first_tb3"  default="tb3_0"/>#arg 可以在launch文件中定义一个变量,利用其中的参数设置<param>和launch文件中的变量<arg>可以在运行launch时从外部修改内部变量，因此甚至可以在运行的同时修改节点内部的参
+数
+  <arg name="second_tb3" default="tb3_1"/>
+  <arg name="third_tb3"  default="tb3_2"/>
+
+
+  <arg name="first_tb3_x_pos" default=" -1.0"/>
+  <arg name="first_tb3_y_pos" default=" -1.0"/>
+  <arg name="first_tb3_z_pos" default=" 0.0"/>
+  <arg name="first_tb3_yaw"   default=" 0.9"/>
+
+  <arg name="second_tb3_x_pos" default=" 0.5"/>
+  <arg name="second_tb3_y_pos" default=" -0.5"/>
+  <arg name="second_tb3_z_pos" default=" 0.0"/>
+  <arg name="second_tb3_yaw"   default=" 2.00"/>
+
+  <arg name="third_tb3_x_pos" default=" 0.0"/>
+  <arg name="third_tb3_y_pos" default=" 1.5"/>
+  <arg name="third_tb3_z_pos" default=" 0.0"/>
+  <arg name="third_tb3_yaw"   default=" 1.57"/>
+
+
+
+
+#include您可以加载属于同一个功能包或不同的功能包的另一个launch，并将其作为一个launch
+文件来运行。
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">#加载empty_world.launch
+    <arg name="world_name" value="$(find turtlebot3_gazebo)/worlds/empty.world"/>
+    <arg name="paused" value="false"/>
+    <arg name="use_sim_time" value="true"/>
+    <arg name="gui" value="true"/>
+    <arg name="headless" value="false"/>
+    <arg name="debug" value="false"/>
+  </include>  
+
+  #group是对指定节点进行分组的标签。选项有ns。这是命名空间（name space），是组的名称，属于该组的节点和消息都包含在由ns指定的名称中。 
+  <group ns = "$(arg first_tb3)">
+  #< param >设置参数名称、类型、值等
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />#加载小车的模型
+  #< node >描述了roslaunch运行的节点。选项包括pkg、type和name。pkg 功能包名称；type 实际运行的节点的名称（节点名）；name 与上述type对应的节点被运行时，起的名称（运行名）。一般情况下使用与type相同的
+名称，但可以根据需要，在运行时更改名称。screen 终端上运行的所有节点的输出将显示在终端屏幕上。
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen">
+      <param name="publish_frequency" type="double" value="50.0" />
+      <param name="tf_prefix" value="$(arg first_tb3)" />
+    </node>
+    
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg first_tb3) -x $(arg first_tb3_x_pos) -y $(arg first_tb3_y_pos) -z $(arg first_tb3_z_pos) -Y $(arg first_tb3_yaw) -param robot_description" />
+  </group>
+
+  <group ns = "$(arg second_tb3)">
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen">
+      <param name="publish_frequency" type="double" value="50.0" />
+      <param name="tf_prefix" value="$(arg second_tb3)" />
+    </node>
+
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg second_tb3) -x $(arg second_tb3_x_pos) -y $(arg second_tb3_y_pos) -z $(arg second_tb3_z_pos) -Y $(arg second_tb3_yaw) -param robot_description" />
+  </group>
+
+  <group ns = "$(arg third_tb3)">
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen">
+      <param name="publish_frequency" type="double" value="50.0" />
+      <param name="tf_prefix" value="$(arg third_tb3)" />
+    </node>
+
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg third_tb3) -x $(arg third_tb3_x_pos) -y $(arg third_tb3_y_pos) -z $(arg third_tb3_z_pos) -Y $(arg third_tb3_yaw) -param robot_description" />
+  </group>
+
+
+  
+
+</launch>

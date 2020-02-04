@@ -1,0 +1,403 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2011, Willow Garage, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#    * Neither the name of the Willow Garage, Inc. nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#       this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+import rospy
+import traceback
+from geometry_msgs.msg import Twist
+import sys, os
+import select as se
+import math
+from math import *
+from nav_msgs.msg import Odometry
+import time
+from numpy import *
+import numpy as np
+# import matplotlib.pyplot as plt
+import tf
+if os.name == 'nt':
+  import msvcrt
+else:
+  import tty, termios
+import matplotlib.pyplot as plt
+import csv
+# global x_plot
+# global y_plot
+# x_plot = array([])
+# y_plot = array([])
+Agent_position=mat(zeros((3,2)))
+Agent_theta=mat(zeros((3,3)))
+Agent_p0 = mat(zeros((3, 3)))
+"""设定三个小车的初始位置"""
+Agent_fomation=matrix([[-0.5,0.3],
+                        [-0.5,-0.3],
+                        [0.0,0.0]])
+ad_mat=matrix([[0.0,1.0,1.0],
+                [1.0,0.0,1.0],
+                [1.0,1.0,0.0]])
+
+dical_mat=matrix([[0.0,0.0],
+                  [0.0,0.0]])              
+    
+"""设定不同型号小车的最大线速度和角速度"""
+BURGER_MAX_LIN_VEL = 0.22
+BURGER_MAX_ANG_VEL = 2.84
+
+WAFFLE_MAX_LIN_VEL = 0.26
+WAFFLE_MAX_ANG_VEL = 1.82
+
+LIN_VEL_STEP_SIZE = 0.01
+ANG_VEL_STEP_SIZE = 0.1
+
+""""""
+def getKey():
+    if os.name == 'nt':
+      return msvcrt.getch()
+
+    tty.setraw(sys.stdin.fileno())
+    rlist, _, _ = se.select([sys.stdin], [], [], 0.1)
+    if rlist:
+        key = sys.stdin.read(1)
+    else:
+        key = ''
+
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+    return key
+
+def vels(target_linear_vel, target_angular_vel):
+    return "currently:\tlinear vel %s\t angular vel %s " % (target_linear_vel,target_angular_vel)
+
+ 
+def makeSimpleProfile(output, input, slop):
+    if input > output:
+        output = min( input, output + slop )
+    elif input < output:
+        output = max( input, output - slop )
+    else:
+        output = input
+    return output
+
+def constrain(input, low, high):
+    if input < low:
+      input = low
+    elif input > high:
+      input = high
+    else:
+      input = input
+    return input
+
+def checkLinearLimitVelocity(vel):
+    if turtlebot3_model == "burger":
+      vel = constrain(vel, -BURGER_MAX_LIN_VEL, BURGER_MAX_LIN_VEL)
+    elif turtlebot3_model == "waffle" or turtlebot3_model == "waffle_pi":
+      vel = constrain(vel, -WAFFLE_MAX_LIN_VEL, WAFFLE_MAX_LIN_VEL)
+    else:
+      vel = constrain(vel, -BURGER_MAX_LIN_VEL, BURGER_MAX_LIN_VEL)
+    return vel
+
+def checkAngularLimitVelocity(vel):
+    if turtlebot3_model == "burger":
+      vel = constrain(vel, -BURGER_MAX_ANG_VEL, BURGER_MAX_ANG_VEL)
+    elif turtlebot3_model == "waffle" or turtlebot3_model == "waffle_pi":
+      vel = constrain(vel, -WAFFLE_MAX_ANG_VEL, WAFFLE_MAX_ANG_VEL)
+    else:
+      vel = constrain(vel, -BURGER_MAX_ANG_VEL, BURGER_MAX_ANG_VEL)
+    return vel
+
+def callback(data):
+    global x_plot
+    global y_plot
+    Agent_Quaternionn=data.pose.pose.orientation
+    Agent_position[0,0]=data.pose.pose.position.x
+    Agent_position[0,1]=data.pose.pose.position.y
+    # x_plot = append(x_plot,Agent_position[0,0])
+    # y_plot = append(y_plot,Agent_position[0,1])
+    Agent_theta[0]=tf.transformations.euler_from_quaternion([Agent_Quaternionn.x,Agent_Quaternionn.y,Agent_Quaternionn.z,Agent_Quaternionn.w])
+def callback1(data):
+    Agent_Quaternionn=data.pose.pose.orientation
+    Agent_position[1,0]=data.pose.pose.position.x
+    Agent_position[1,1]=data.pose.pose.position.y
+    Agent_theta[1]=tf.transformations.euler_from_quaternion([Agent_Quaternionn.x,Agent_Quaternionn.y,Agent_Quaternionn.z,Agent_Quaternionn.w])
+
+def callback2(data):
+    Agent_Quaternionn=data.pose.pose.orientation
+    Agent_position[2,0]=data.pose.pose.position.x
+    Agent_position[2,1]=data.pose.pose.position.y
+    Agent_theta[2]=tf.transformations.euler_from_quaternion([Agent_Quaternionn.x,Agent_Quaternionn.y,Agent_Quaternionn.z,Agent_Quaternionn.w])
+
+
+def angular_vel_judge(angual_vel):
+    if(abs(angual_vel)>3.14):
+        return (-1*sign(angual_vel)*(6.28-abs(angual_vel)))    
+    else:
+        return angual_vel
+
+def control_output(x,y,theta,iden):
+    x_avoid=0
+    y_avoid=0
+
+    if(iden==0):
+        angent_dis=distance_a1_a2(Agent_position[0],Agent_position[1])
+        if(angent_dis<Agent_p0[0,1]):
+            x_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[0,1])*(Agent_position[0,0]-Agent_position[1,0])/pow(angent_dis,3)
+            y_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[0,1])*(Agent_position[0,1]-Agent_position[1,1])/pow(angent_dis,3)
+        angent_dis=distance_a1_a2(Agent_position[0],Agent_position[2])
+        if(angent_dis<Agent_p0[0,2]):
+            x_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[0,2])*(Agent_position[0,0]-Agent_position[2,0])/pow(angent_dis,3)
+            y_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[0,2])*(Agent_position[0,1]-Agent_position[2,1])/pow(angent_dis,3)
+
+    if(iden==1):
+        angent_dis=distance_a1_a2(Agent_position[1],Agent_position[0])
+        if(angent_dis<Agent_p0[1,0]):
+            x_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[1,0])*(Agent_position[1,0]-Agent_position[0,0])/pow(angent_dis,3)
+            y_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[1,0])*(Agent_position[1,1]-Agent_position[0,1])/pow(angent_dis,3)
+        angent_dis=distance_a1_a2(Agent_position[1],Agent_position[2])
+        if(angent_dis<Agent_p0[1,2]):
+            x_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[1,2])*(Agent_position[1,0]-Agent_position[2,0])/pow(angent_dis,3)
+            y_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[1,2])*(Agent_position[1,1]-Agent_position[2,1])/pow(angent_dis,3)
+
+
+    if(iden==2):
+        angent_dis=distance_a1_a2(Agent_position[2],Agent_position[0])
+        if(angent_dis<Agent_p0[2,0]):
+            x_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[2,0])*(Agent_position[2,0]-Agent_position[0,0])/pow(angent_dis,3)
+            y_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[2,0])*(Agent_position[2,1]-Agent_position[0,1])/pow(angent_dis,3)
+        angent_dis=distance_a1_a2(Agent_position[2],Agent_position[1])
+        if(angent_dis<Agent_p0[2,1]):
+            x_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[2,1])*(Agent_position[2,0]-Agent_position[1,0])/pow(angent_dis,3)
+            y_avoid+=(1/angent_dis-1/angent_dis<Agent_p0[2,1])*(Agent_position[2,1]-Agent_position[1,1])/pow(angent_dis,3)
+
+    # x+=x_avoid*0.1
+    # y+=y_avoid*0.1
+    linear_c_vel=(math.cos(theta)*x+math.sin(theta)*y)
+    # linear_c_vel=0.3*math.sqrt(math.pow(x, 2)+math.pow(y+0.1, 2))
+    # angle_c_vel =3*angular_vel_judge(math.atan2(y+0.25,x)-theta)
+    angle_c_vel =6.66*(-1*math.sin(theta)*x+math.cos(theta)*y)
+    return linear_c_vel,angle_c_vel
+
+def distance_a1_a2(x1,x2):
+    return sqrt(pow(x1[0,0]-x2[0,0],2)+pow(x1[0,1]-x2[0,1],2))
+
+
+if __name__=="__main__":
+    if os.name != 'nt':
+        settings = termios.tcgetattr(sys.stdin)
+    ref_position=mat(zeros((3,2)))
+    rospy.init_node('turtlebot3_telep')
+    pub = rospy.Publisher('/tb3_0/cmd_vel', Twist, queue_size=10)
+    pub1= rospy.Publisher('/tb3_1/cmd_vel', Twist, queue_size=10)
+    pub2= rospy.Publisher('/tb3_2/cmd_vel', Twist, queue_size=10)
+    sub1= rospy.Subscriber('/tb3_0/odom', Odometry, callback,queue_size=1) 
+    sub2= rospy.Subscriber('/tb3_1/odom', Odometry, callback1,queue_size=1) 
+    sub3= rospy.Subscriber('/tb3_2/odom', Odometry, callback2,queue_size=1) 
+    turtlebot3_model = rospy.get_param("model", "waffle_pi")
+    status = 0
+    target_linear_vel   = 0.0
+    target_angular_vel  = 0.0
+    target_x=0.0
+    target_y=0.0
+    target_theta=1.5707
+    target_xy_vel       = mat(zeros((3,2)))
+    control_linear_vel  = mat(zeros((3,1)))
+    control_angular_vel = mat(zeros((3,1)))
+    target_position=mat(zeros((1,2)))
+    theta_tar=0.0
+    control_linear_vel1 =0.0
+    control_angular_vel1=0.0
+    run_time =0.0
+    time_s=array([])
+    leader_velo=0.15
+    leader_w=0.1
+    ref_velo=zeros((3,2))
+    x0_plot = array([])
+    y0_plot = array([])
+    x1_plot = array([])
+    y1_plot = array([])
+    x2_plot = array([])
+    y2_plot = array([])
+    e0_plot = array([])
+    e1_plot = array([])
+    e2_plot = array([])
+    ex0_plot = array([])
+    ex1_plot = array([])
+    ex2_plot = array([])
+    ey0_plot = array([])
+    ey1_plot = array([])
+    ey2_plot = array([])
+
+    for i in range(3):     
+        for j in range(3):
+            Agent_p0[i,j]=0.75*distance_a1_a2(Agent_fomation[i],Agent_fomation[j])
+    rospy.sleep(1)
+    try:
+        ros_rate=rospy.Rate(10)
+        begin=rospy.get_time()
+        while(not rospy.is_shutdown()):
+            run_time=rospy.get_time()-begin
+            target_position[0,0]=1.5*cos(run_time*0.1)-1.5
+            target_position[0,1]=1.5*sin(run_time*0.1)
+            target_theta=run_time*0.1+1.5707
+            key = getKey()
+            if key == 'w' :
+                Agent_fomation=matrix([[-0.5,0.0],
+                                       [-1.0,0.0],
+                                        [0.0,0.0]])
+            else:
+                if (key == '\x03'):
+                    # print(x_plot)
+                    # print(y_plot)
+                    break
+                if (key == 's'):
+                    Agent_fomation=matrix([[-2.0,0.0],
+                                       [-1,0.0],
+                                        [0.0,0.0]])
+
+
+
+                #This code is to draw the figure of angent traiecroty and traking error  
+
+                if (key == 'a'):
+                    np.savetxt('/home/zyq/1.csv',np.column_stack((x0_plot,y0_plot,x1_plot,y1_plot,x2_plot,y2_plot,ex0_plot,ex1_plot,ex2_plot,ey0_plot,ey1_plot,ey2_plot,time_s)),fmt='%f')
+                    plt.figure(1)
+                    l1,=plt.plot(x0_plot,y0_plot,'r',label='agent1')
+                    l2,=plt.plot(x1_plot,y1_plot,'g',label='agent2')
+                    l3,=plt.plot(x2_plot,y2_plot,'b',label='agent3')
+
+                    plt.legend([l1, l2,l3], ['agent1', 'agent2','agent3'], loc = 'upper right')  
+                    plt.xlabel(u'x position(m)',fontproperties='SimHei',fontsize=14)
+                    plt.ylabel(u'y position(m)',fontproperties='SimHei',fontsize=14)
+                    plt.title('Agent Trajectory')
+                    line_lenth=x0_plot.size-10
+                    for i in range(4):
+                        plt.annotate(s='',xy=(x0_plot[(i+1)*line_lenth/5-10],y0_plot[(i+1)*line_lenth/5-10]),xytext=(x0_plot[(i+1)*line_lenth/5-18],y0_plot[(i+1)*line_lenth/5-18]),weight='bold',color='r',\
+             arrowprops=dict(arrowstyle='simple',connectionstyle='arc3',linewidth=1,color='red'))
+                        plt.annotate(s='',xy=(x1_plot[(i+1)*line_lenth/5-10],y1_plot[(i+1)*line_lenth/5-10]),xytext=(x1_plot[(i+1)*line_lenth/5-18],y1_plot[(i+1)*line_lenth/5-18]),weight='bold',color='g',\
+             arrowprops=dict(arrowstyle='simple',connectionstyle='arc3',linewidth=1,color='green'))
+                        plt.annotate(s='',xy=(x2_plot[(i+1)*line_lenth/5-10],y2_plot[(i+1)*line_lenth/5-10]),xytext=(x2_plot[(i+1)*line_lenth/5-18],y2_plot[(i+1)*line_lenth/5-18]),weight='bold',color='b',\
+             arrowprops=dict(arrowstyle='simple',connectionstyle='arc3',linewidth=1,color='blue'))
+                        plt.plot([x0_plot[(i+1)*line_lenth/5-10],x1_plot[(i+1)*line_lenth/5-10]],[y0_plot[(i+1)*line_lenth/5-10],y1_plot[(i+1)*line_lenth/5-10]],linestyle=":",color = 'black')
+                        plt.plot([x1_plot[(i+1)*line_lenth/5-10],x2_plot[(i+1)*line_lenth/5-10]],[y1_plot[(i+1)*line_lenth/5-10],y2_plot[(i+1)*line_lenth/5-10]],linestyle=":",color = 'black')
+                        plt.plot([x0_plot[(i+1)*line_lenth/5-10],x2_plot[(i+1)*line_lenth/5-10]],[y0_plot[(i+1)*line_lenth/5-10],y2_plot[(i+1)*line_lenth/5-10]],linestyle=":",color = 'black')
+                    plt.figure(2)
+                    l1,=plt.plot(time_s,e0_plot,'r',label='agent1')
+                    l2,=plt.plot(time_s,e1_plot,'g',label='agent2')
+                    l3,=plt.plot(time_s,e2_plot,'b',label='agent3')
+
+                    plt.legend([l1, l2,l3], ['agent1', 'agent2','agent3'], loc = 'upper right')  
+                    plt.ylabel(u'error(m)',fontproperties='SimHei',fontsize=14)
+                    plt.xlabel(u'time(sec)',fontproperties='SimHei',fontsize=14)
+                    plt.title('Tracking Error')
+                    plt.show()
+   
+            #this code is the control part
+            twist = Twist()
+            last_refer_position= ref_position.copy()
+            for i in range(3):
+                target_xy_vel[i]=[0.0,0.0]
+                dical_mat[0,0]=math.cos(target_theta)
+                dical_mat[1,0]=-1*math.sin(target_theta)
+                dical_mat[0,1]=math.sin(target_theta)
+                dical_mat[1,1]=math.cos(target_theta)
+                ref_position[i]=target_position[0]+dot(Agent_fomation[i],dical_mat)
+                ref_velo=dot(Agent_fomation,
+                             matrix([[-leader_w*sin(target_theta),leader_w*cos(target_theta)],
+                                    [-leader_w*cos(target_theta),-leader_w*sin(target_theta)]]))
+                ref_velo[0,0]=leader_velo*math.cos(target_theta)+ref_velo[0,0]
+                ref_velo[0,1]=leader_velo*math.sin(target_theta)+ref_velo[0,1]
+                ref_velo[1,0]=leader_velo*math.cos(target_theta)+ref_velo[1,0]
+                ref_velo[1,1]=leader_velo*math.sin(target_theta)+ref_velo[1,1]
+                ref_velo[2,0]=leader_velo*math.cos(target_theta)+ref_velo[2,0]
+                ref_velo[2,1]=leader_velo*math.sin(target_theta)+ref_velo[2,1]
+                for j in range(3):
+                    if(j != i):
+                        target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
+                target_xy_vel[i]=ref_velo[i]-0.2*( Agent_position[i]-ref_position[i])+target_xy_vel[i]
+           
+            x0_plot = append(x0_plot,Agent_position[0,0])
+            y0_plot = append(y0_plot,Agent_position[0,1])
+            x1_plot = append(x1_plot,Agent_position[1,0])
+            y1_plot = append(y1_plot,Agent_position[1,1])
+            x2_plot = append(x2_plot,Agent_position[2,0])
+            y2_plot = append(y2_plot,Agent_position[2,1])
+            ex0_plot = append(ex0_plot,-Agent_position[0,0]+ref_position[0,0])
+            ex1_plot = append(ex1_plot,-Agent_position[1,0]+ref_position[1,0])
+            ex2_plot = append(ex2_plot,-Agent_position[2,0]+ref_position[2,0])
+            ey0_plot = append(ey0_plot,-Agent_position[0,1]+ref_position[0,1])
+            ey1_plot = append(ey1_plot,-Agent_position[1,1]+ref_position[1,1])
+            ey2_plot = append(ey2_plot,-Agent_position[2,1]+ref_position[2,1])
+            dis_e0=distance_a1_a2(Agent_position[0],ref_position[0])
+            dis_e1=distance_a1_a2(Agent_position[1],ref_position[1])
+            dis_e2=distance_a1_a2(Agent_position[2],ref_position[2])
+            e0_plot = append(e0_plot,dis_e0)
+            e1_plot = append(e1_plot,dis_e1)
+            e2_plot = append(e2_plot,dis_e2)
+            time_s  = append(time_s,run_time)
+           
+            (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[0,0],target_xy_vel[0,1],Agent_theta[0,2],0)
+            control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
+            twist.linear.x = control_linear_vel1; twist.linear.y = 0.0; twist.linear.z = 0.0
+            control_angular_vel1 = makeSimpleProfile(control_angular_vel1, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0))
+            twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z = control_angular_vel1
+            pub.publish(twist)
+
+            (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[1,0],target_xy_vel[1,1],Agent_theta[1,2],1)
+            control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
+            twist.linear.x = control_linear_vel1; twist.linear.y = 0.0; twist.linear.z = 0.0
+            control_angular_vel1 = makeSimpleProfile(control_angular_vel1, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0))
+            twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z = control_angular_vel1
+            pub1.publish(twist)
+    
+            (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[2,0],target_xy_vel[2,1],Agent_theta[2,2],2)
+            control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
+            twist.linear.x =  control_linear_vel1; twist.linear.y = 0.0; twist.linear.z = 0.0
+            control_angular_vel1 = makeSimpleProfile(control_angular_vel1, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0))
+            twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z =  control_angular_vel1
+            pub2.publish(twist)
+            ros_rate.sleep()
+
+     # error process       
+    except Exception as e:
+           print 'str(Exception):\t', str(Exception)
+           print 'str(e):\t\t', str(e)
+           print 'repr(e):\t', repr(e)
+           print 'e.message:\t', e.message
+           print 'traceback.print_exc():'; traceback.print_exc()
+           print 'traceback.format_exc():\n%s' % traceback.format_exc()
+        
+
+    finally:
+        twist = Twist()
+        twist.linear.x = 0.0; twist.linear.y = 0.0; twist.linear.z = 0.0
+        twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z = 0.0
+        pub.publish(twist)
+        pub1.publish(twist)
+        pub2.publish(twist)
+
+
+    if os.name != 'nt':
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+
