@@ -65,7 +65,7 @@ LIN_VEL_STEP_SIZE = 0.01
 ANG_VEL_STEP_SIZE = 0.1
 
 
-def getKey():
+def getKey():#获取键盘值
     if os.name == 'nt':
       return msvcrt.getch()
 
@@ -79,11 +79,11 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
-def vels(target_linear_vel, target_angular_vel):
+def vels(target_linear_vel, target_angular_vel):#返回当前线速度和角速度
     return "currently:\tlinear vel %s\t angular vel %s " % (target_linear_vel,target_angular_vel)
 
  
-def makeSimpleProfile(output, input, slop):
+def makeSimpleProfile(output, input, slop):#对输出进行限定，slopl理解为偏移量
     if input > output:
         output = min( input, output + slop )
     elif input < output:
@@ -101,8 +101,8 @@ def constrain(input, low, high):
       input = input
     return input
 
-def checkLinearLimitVelocity(vel):
-    if turtlebot3_model == "burger":
+def checkLinearLimitVelocity(vel):#对不同型号的小车进行输入线速度限制在一定范围内
+    if turtlebot3_model == "burger":#-0.22～0.22
       vel = constrain(vel, -BURGER_MAX_LIN_VEL, BURGER_MAX_LIN_VEL)
     elif turtlebot3_model == "waffle" or turtlebot3_model == "waffle_pi":
       vel = constrain(vel, -WAFFLE_MAX_LIN_VEL, WAFFLE_MAX_LIN_VEL)
@@ -110,7 +110,7 @@ def checkLinearLimitVelocity(vel):
       vel = constrain(vel, -BURGER_MAX_LIN_VEL, BURGER_MAX_LIN_VEL)
     return vel
 
-def checkAngularLimitVelocity(vel):
+def checkAngularLimitVelocity(vel):#对不同型号的小车进行角速度速度限制在一定范围内
     if turtlebot3_model == "burger":
       vel = constrain(vel, -BURGER_MAX_ANG_VEL, BURGER_MAX_ANG_VEL)
     elif turtlebot3_model == "waffle" or turtlebot3_model == "waffle_pi":
@@ -119,10 +119,17 @@ def checkAngularLimitVelocity(vel):
       vel = constrain(vel, -BURGER_MAX_ANG_VEL, BURGER_MAX_ANG_VEL)
     return vel
 
+#-------------------------------------------------------------
+#定义Agent_position表示小车的位置，由于小车在平面上，所以实际上只用到了position.x,position.y，对应Twist消息中的linear.x;linear.y
+# Agent_theta表示小车的姿态,实际上只用到了偏航角，对应Twist消息中的angular.z
+#传入的data为测位消息odom
 def callback(data):
+    #orientation 表示姿态四元素
     Agent_Quaternionn=data.pose.pose.orientation
     Agent_position[0,0]=data.pose.pose.position.x
     Agent_position[0,1]=data.pose.pose.position.y
+    #将四元素转换为欧拉角，Agent_theta[0]=(r, p, y)，表示滚转角、俯仰角、偏航角
+    #为了与Twist消息中的angular的x,y,z()对应上,angular.z表示绕z轴转动，在world中对应yaw
     Agent_theta[0]=tf.transformations.euler_from_quaternion([Agent_Quaternionn.x,Agent_Quaternionn.y,Agent_Quaternionn.z,Agent_Quaternionn.w])
 def callback1(data):
     Agent_Quaternionn=data.pose.pose.orientation
@@ -135,7 +142,7 @@ def callback2(data):
     Agent_position[2,0]=data.pose.pose.position.x
     Agent_position[2,1]=data.pose.pose.position.y
     Agent_theta[2]=tf.transformations.euler_from_quaternion([Agent_Quaternionn.x,Agent_Quaternionn.y,Agent_Quaternionn.z,Agent_Quaternionn.w])
-
+#-------------------------------------------------------------
 
 def angular_vel_judge(angual_vel):
     if(abs(angual_vel)>3.14):
@@ -145,12 +152,16 @@ def angular_vel_judge(angual_vel):
 
 def control_output(x,y,theta,iden=2):
     if(iden==1):
+        #linear_c_vel=0.2*abs(x)+(y+0.1)^2
         linear_c_vel=0.2*math.sqrt(math.pow(x, 2)+math.pow(y+0.1, 2))
     else:
+        #iden==2
+        #linear_c_vel=x*cos(theta)+y*sin(theta)
         linear_c_vel=(math.cos(theta)*x+math.sin(theta)*y)
         # linear_c_vel=0.3*math.sqrt(math.pow(x, 2)+math.pow(y+0.1, 2))
     # angle_c_vel =3*angular_vel_judge(math.atan2(y+0.25,x)-theta)
     angle_c_vel =6.66*(-1*math.sin(theta)*x+math.cos(theta)*y)
+    #angle_c_vel=6.66*(-x*sin(theta)+y*cos(theta))
     return linear_c_vel,angle_c_vel
 
 if __name__=="__main__":
@@ -161,10 +172,11 @@ if __name__=="__main__":
     pub = rospy.Publisher('/tb3_0/cmd_vel', Twist, queue_size=10)
     pub1= rospy.Publisher('/tb3_1/cmd_vel', Twist, queue_size=10)
     pub2= rospy.Publisher('/tb3_2/cmd_vel', Twist, queue_size=10)
+    #callback作用：收到新消息时，将调用回调，并将消息作为第一个参数。
     sub1= rospy.Subscriber('/tb3_0/odom', Odometry, callback,queue_size=1) 
     sub2= rospy.Subscriber('/tb3_1/odom', Odometry, callback1,queue_size=1) 
     sub3= rospy.Subscriber('/tb3_2/odom', Odometry, callback2,queue_size=1) 
-    turtlebot3_model = rospy.get_param("model", "waffle_pi")
+    turtlebot3_model = rospy.get_param("model", "waffle_pi")#设置节点参数
     ros_rate=rospy.Rate(50)
     status = 0
     target_linear_vel   = 0.0
@@ -188,19 +200,21 @@ if __name__=="__main__":
                                        [-1.0,0.0],
                                         [0.0,0.0]])
             else:
-                if (key == '\x03'):
+                if (key == '\x03'):#ctrl+c
                     break
-            twist = Twist()
+            twist = Twist()#linear、agular
             for i in range(3):
                 target_xy_vel[i]=[0.0,0.0]
                 dical_mat[0,0]=math.cos(Agent_theta[2,2])
                 dical_mat[1,0]=-1*math.sin(Agent_theta[2,2])
                 dical_mat[0,1]=math.sin(Agent_theta[2,2])
                 dical_mat[1,1]=math.cos(Agent_theta[2,2])
-                ref_position[i]=Agent_position[2]+dot(Agent_fomation[i],dical_mat)
+                ref_position[i]=Agent_position[2]+dot(Agent_fomation[i],dical_mat)#dot定义矩阵乘法
+                
                 ref_velo=dot(Agent_fomation,
                              matrix([[-leader_w*sin(Agent_theta[2,2]),leader_w*cos(Agent_theta[2,2])],
                                     [-leader_w*cos(Agent_theta[2,2]),-leader_w*sin(Agent_theta[2,2])]]))
+                
                 ref_velo[0,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[0,0]
                 ref_velo[0,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[0,1]
                 ref_velo[1,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[1,0]
@@ -210,26 +224,42 @@ if __name__=="__main__":
                         target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
                 target_xy_vel[i]=ref_velo[i]-0.2*( Agent_position[i]-ref_position[i])+target_xy_vel[i]
         
+            #----------------------------------------------------------------
+            #对第一辆小车发布twist消息（对/tb3_0）
+            #输出的线速度和角速度(twist)
+            #默认iden=2,即linear_c_vel=x*cos(theta)+y*sin(theta)，angle_c_vel=6.66*(-x*sin(theta)+y*cos(theta))
             (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[0,0],target_xy_vel[0,1],Agent_theta[0,2])
+            #利用makeSimplefile对control_linear_vell再进行处理,output=control_linear_vel1,input=target_linear_vel
             control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
+            #设定linear.x=control_linear_vel,linear.y=0,linear.z=0
             twist.linear.x = control_linear_vel1; twist.linear.y = 0.0; twist.linear.z = 0.0
             control_angular_vel1 = makeSimpleProfile(control_angular_vel1, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0))
-            twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z = control_angular_vel1
+            twist.angular.x = 0.0; twist.angular.y = 0.0;twist.angular.z = control_angular_vel1
             pub.publish(twist)
+            #----------------------------------------------------------------
 
+            #----------------------------------------------------------------
+            #对第二辆小车发布twist消息（/tb3_1）
             (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[1,0],target_xy_vel[1,1],Agent_theta[1,2])
             control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
             twist.linear.x = control_linear_vel1; twist.linear.y = 0.0; twist.linear.z = 0.0
             control_angular_vel1 = makeSimpleProfile(control_angular_vel1, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0))
             twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z = control_angular_vel1
             pub1.publish(twist)
-    
+            #----------------------------------------------------------------
+
+            #----------------------------------------------------------------
+            #对第三辆小车发布twist消息
             (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[2,0],target_xy_vel[2,1],Agent_theta[2,2])
             control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
+            #因为leleader_velo=0.1,所以twist.linear=(0.1,0,0)
             twist.linear.x =  leader_velo; twist.linear.y = 0.0; twist.linear.z = 0.0
             control_angular_vel1 = makeSimpleProfile(control_angular_vel1, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0))
+            #因为leader_w=0,所以twist.angular=(0,0,0)
             twist.angular.x = 0.0; twist.angular.y = 0.0; twist.angular.z = leader_w
             pub2.publish(twist)
+            #实际上对/tb3_2发布的twist消息为定值
+            #----------------------------------------------------------------
             ros_rate.sleep()
     except Exception as e:
            print 'str(Exception):\t', str(Exception)
@@ -251,3 +281,6 @@ if __name__=="__main__":
 
     if os.name != 'nt':
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+"""
+该控制算法使得/tb3_0和tb3_1能够跟随tb3_2进行移动
+"""

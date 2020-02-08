@@ -28,19 +28,19 @@
 # POSSIBILITY OF SUCH DAMAGE.
 import rospy
 import traceback
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist#导入geometry_msgs包中的Twist消息类型
 import sys, os
 import select as se
 import math
 from math import *
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry#turtlebot3的测位信息
 import time
 from numpy import *
 import numpy as np
 # import matplotlib.pyplot as plt
 import tf
-if os.name == 'nt':
-  import msvcrt
+if os.name == 'nt':#os.name该变量返回当前操作系统的类型,nt对应Windows
+  import msvcrt#如果操作系统为Windows，导入msvcrt,，用于直接读取用户输入。
 else:
   import tty, termios
 import matplotlib.pyplot as plt
@@ -206,14 +206,31 @@ def distance_a1_a2(x1,x2):
 if __name__=="__main__":
     if os.name != 'nt':
         settings = termios.tcgetattr(sys.stdin)
-    ref_position=mat(zeros((3,2)))
-    rospy.init_node('turtlebot3_telep')
+    ref_position = mat(zeros((3, 2)))
+
+    """
+        ----------------------------------------
+        这部分代码编写发布节点和订阅节点
+    """
+    rospy.init_node('turtlebot3_telep')#注册和初始化节点turtlebot3_telep，声明节点的名字，直到rospy有这个信息，它才能开始与ROS Master通信。
     pub = rospy.Publisher('/tb3_0/cmd_vel', Twist, queue_size=10)
+    #定义发布器，发布的topic为/tb3_0/cmd_vel topic,消息类型为Twist，然后queue_size是在订阅者接受消息不够快的时候保留的消息的数量，
+    #声明节点使用消息类型Twist发布到/tb3_0/cmd_vel topic,
+    ##queue_size参数在ROS hydro中是新的参数 ，如果任何订户没有fast enough接收它们，则限制排队消息的数量
     pub1= rospy.Publisher('/tb3_1/cmd_vel', Twist, queue_size=10)
     pub2= rospy.Publisher('/tb3_2/cmd_vel', Twist, queue_size=10)
-    sub1= rospy.Subscriber('/tb3_0/odom', Odometry, callback,queue_size=1) 
+    sub1 = rospy.Subscriber('/tb3_0/odom', Odometry, callback, queue_size=1)
+    # 这声明节点订阅了Odometry类型的/tb3_0/odom主题。收到新消息时，将调用回调，并将消息作为第一个参数。
     sub2= rospy.Subscriber('/tb3_1/odom', Odometry, callback1,queue_size=1) 
-    sub3= rospy.Subscriber('/tb3_2/odom', Odometry, callback2,queue_size=1) 
+    sub3 = rospy.Subscriber('/tb3_2/odom', Odometry, callback2, queue_size=1)
+    """
+       ----------------------------------------
+    """
+    
+    """
+        -------------------------------------
+        初始参数设置
+    """
     turtlebot3_model = rospy.get_param("model", "waffle_pi")
     status = 0
     target_linear_vel   = 0.0
@@ -248,13 +265,16 @@ if __name__=="__main__":
     ey0_plot = array([])
     ey1_plot = array([])
     ey2_plot = array([])
+    """
+        --------------------------------
+    """
 
     for i in range(3):     
         for j in range(3):
             Agent_p0[i,j]=0.75*distance_a1_a2(Agent_fomation[i],Agent_fomation[j])
     rospy.sleep(1)
     try:
-        ros_rate=rospy.Rate(10)
+        ros_rate=rospy.Rate(10)#里初始化一个Rate对象，通过后面的sleep()可以设定循环的频率，它的参数为10，我们期望每秒循环10次
         begin=rospy.get_time()
         while(not rospy.is_shutdown()):
             run_time=rospy.get_time()-begin
@@ -281,7 +301,7 @@ if __name__=="__main__":
                 #This code is to draw the figure of angent traiecroty and traking error  
 
                 if (key == 'a'):
-                    np.savetxt('/home/zyq/1.csv',np.column_stack((x0_plot,y0_plot,x1_plot,y1_plot,x2_plot,y2_plot,ex0_plot,ex1_plot,ex2_plot,ey0_plot,ey1_plot,ey2_plot,time_s)),fmt='%f')
+                    np.savetxt('/home/ssl/1.csv',np.column_stack((x0_plot,y0_plot,x1_plot,y1_plot,x2_plot,y2_plot,ex0_plot,ex1_plot,ex2_plot,ey0_plot,ey1_plot,ey2_plot,time_s)),fmt='%f')
                     plt.figure(1)
                     l1,=plt.plot(x0_plot,y0_plot,'r',label='agent1')
                     l2,=plt.plot(x1_plot,y1_plot,'g',label='agent2')

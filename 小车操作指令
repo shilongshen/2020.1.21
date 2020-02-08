@@ -1,0 +1,12 @@
+三个小车：
+在launch文件夹下运行roslaunch multi_turtlebot3.launch 
+在src文件夹下运行python turtlebot3_teleop_key
+可按w键变换队形（由三角形变为直线）
+turtlebot3_cycle_formation(圆编队)
+四个小车
+在launch文件夹下运行roslaunch multi_turtlebot3.launch 
+在src文件夹下运行python turtlebot3_teleop_key
+在src文件夹下运行python turtlebot3_formation
+（排列成正方形）
+
+
