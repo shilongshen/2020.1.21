@@ -48,7 +48,6 @@ else:
 
 Agent_position=mat(zeros((3,2)))
 Agent_theta=mat(zeros((3,3)))
-Agent_fomation=matrix([[-0.5,0.3],
                         [-0.5,-0.3],
                         [0.0,0.0]])
 ad_mat=matrix([[0.0,1.0,1.0],
@@ -209,31 +208,44 @@ if __name__=="__main__":
             twist = Twist()#linear、agular
             for i in range(3):
                 target_xy_vel[i]=[0.0,0.0]
+                #dical_mat表示/tb3_2绕z轴的旋转矩阵
                 dical_mat[0,0]=math.cos(Agent_theta[2,2])
                 dical_mat[1,0]=-1*math.sin(Agent_theta[2,2])
                 dical_mat[0,1]=math.sin(Agent_theta[2,2])
                 dical_mat[1,1]=math.cos(Agent_theta[2,2])
+
                 #ref_position表示小车的相对位置,表示小车的目标位置
+                #根据/tb3_2的位置计算出其他两台小车的位置
                 ref_position[i]=Agent_position[2]+dot(Agent_fomation[i],dical_mat)#dot定义矩阵乘法
+                
+                #----------------------------------------------------------
+                """
+                由于对tb3_2发送的angular指令为0,而且发送的linear.x=0.1,linear.y=linear.z=0,所以
+                Agent_theta[2,2]会随着时间的增大而减小,tb3_2会最终沿x轴行驶
+                """
                 
                 #定义ref_velo的初始值为0，表示小车的相对速度，实际上小车的相对速度
                 ref_velo=dot(Agent_fomation,
                              matrix([[-leader_w*sin(Agent_theta[2,2]),leader_w*cos(Agent_theta[2,2])],
                                     [-leader_w*cos(Agent_theta[2,2]),-leader_w*sin(Agent_theta[2,2])]]))
-                #对ref_velo进行更新
+                #对ref_velo进行更新，ref_velo[1]表示第一辆小车的相对速度，ref_velo[2]表示第二辆小车的速度
                 ref_velo[0,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[0,0]
                 ref_velo[0,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[0,1]
                 ref_velo[1,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[1,0]
                 ref_velo[1,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[1,1]
-                for j in range(3):#？
+                #target_xy_vel是如何定义的？
+                for j in range(3):#？把此处的循环注释掉不会影响编队行驶
                     if(j != i):
                         target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
+                #target_xy_vel设计原理？
+                #ref_velo[i]添加到/tb3_0、tb3_1，影响了小车的相对位置
                 target_xy_vel[i]=ref_velo[i]-0.2*( Agent_position[i]-ref_position[i])+target_xy_vel[i]
         
             #----------------------------------------------------------------
             #对第一辆小车发布twist消息（对/tb3_0）
             #输出的线速度和角速度(twist)
             #默认iden=2,即linear_c_vel=x*cos(theta)+y*sin(theta)，angle_c_vel=6.66*(-x*sin(theta)+y*cos(theta))
+            #如何根据target_xy_vel计算出小车的线速度和角速度
             (control_linear_vel1 ,control_angular_vel1)=control_output(target_xy_vel[0,0],target_xy_vel[0,1],Agent_theta[0,2])
             #利用makeSimplefile对control_linear_vell再进行处理,output=control_linear_vel1,input=target_linear_vel
             control_linear_vel1 = makeSimpleProfile(control_linear_vel1, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0))
