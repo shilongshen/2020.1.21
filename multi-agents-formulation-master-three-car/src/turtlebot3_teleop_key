@@ -213,17 +213,19 @@ if __name__=="__main__":
                 dical_mat[1,0]=-1*math.sin(Agent_theta[2,2])
                 dical_mat[0,1]=math.sin(Agent_theta[2,2])
                 dical_mat[1,1]=math.cos(Agent_theta[2,2])
+                #ref_position表示小车的相对位置,表示小车的目标位置
                 ref_position[i]=Agent_position[2]+dot(Agent_fomation[i],dical_mat)#dot定义矩阵乘法
                 
+                #定义ref_velo的初始值为0，表示小车的相对速度，实际上小车的相对速度
                 ref_velo=dot(Agent_fomation,
                              matrix([[-leader_w*sin(Agent_theta[2,2]),leader_w*cos(Agent_theta[2,2])],
                                     [-leader_w*cos(Agent_theta[2,2]),-leader_w*sin(Agent_theta[2,2])]]))
-                
+                #对ref_velo进行更新
                 ref_velo[0,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[0,0]
                 ref_velo[0,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[0,1]
                 ref_velo[1,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[1,0]
                 ref_velo[1,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[1,1]
-                for j in range(3):
+                for j in range(3):#？
                     if(j != i):
                         target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
                 target_xy_vel[i]=ref_velo[i]-0.2*( Agent_position[i]-ref_position[i])+target_xy_vel[i]
