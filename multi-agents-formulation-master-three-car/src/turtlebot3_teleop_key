@@ -46,16 +46,17 @@ if os.name == 'nt':
 else:
   import tty, termios
 
-Agent_position=mat(zeros((3,2)))
-Agent_theta=mat(zeros((3,3)))
+Agent_position=mat(zeros((3,2)))#实际位置
+Agent_theta=mat(zeros((3,3)))#角度
+Agent_fomation=matrix([[-0.5,0.3],
                         [-0.5,-0.3],
-                        [0.0,0.0]])
+                        [0.0,0.0]])#队形矩阵
 ad_mat=matrix([[0.0,1.0,1.0],
                 [1.0,0.0,1.0],
-                [1.0,1.0,0.0]])
+                [1.0,1.0,0.0]])#邻接矩阵，选择移动机器人的通信拓扑结构，既每个移动机器人都能够接收到其余机器人的位置信息
 
 dical_mat=matrix([[0.0,0.0],
-                  [0.0,0.0]])              
+                  [0.0,0.0]])  #绕z轴的旋转矩阵            
     
 
 BURGER_MAX_LIN_VEL = 0.22
@@ -123,7 +124,7 @@ def checkAngularLimitVelocity(vel):#对不同型号的小车进行角速度速�
     return vel
 
 #-------------------------------------------------------------
-#定义Agent_position表示小车的位置，由于小车在平面上，所以实际上只用到了position.x,position.y，对应Twist消息中的linear.x;linear.y
+#定义Agent_position表示小车的实际位置，由于小车在平面上，所以实际上只用到了position.x,position.y，对应Twist消息中的linear.x;linear.y
 # Agent_theta表示小车的姿态,实际上只用到了偏航角，对应Twist消息中的angular.z
 #传入的data为测位消息odom
 def callback(data):
@@ -153,7 +154,12 @@ def angular_vel_judge(angual_vel):
     else:
         return angual_vel
 
-def control_output(x,y,theta,iden=2):
+
+"""
+    control_output的作用:设计的控制器输出为对x轴和y轴的速度控制量，而发送的twist消息为线速度和角速度，需要通过一个
+    坐标变换矩阵将对x轴和y轴的速度控制量转换为线速度和角速度
+"""
+def control_output(x,y,theta,iden=2)：
     if(iden==1):
         #linear_c_vel=0.2*abs(x)+(y+0.1)^2
         linear_c_vel=0.2*math.sqrt(math.pow(x, 2)+math.pow(y+0.1, 2))
@@ -214,17 +220,20 @@ if __name__=="__main__":
                 dical_mat[0,1]=math.sin(Agent_theta[2,2])
                 dical_mat[1,1]=math.cos(Agent_theta[2,2])
 
-                #ref_position表示小车的相对位置,表示小车的目标位置
-                #根据/tb3_2的位置计算出其他两台小车的位置
+                """
+                    根据/tb3_2的位置计算出其他两台小车的位置，/tb3_2可视为虚拟参照，其坐标视为虚拟参照位置
+
+                    ref_position表示小车在物理坐标系下的目标位置
+                """
                 ref_position[i]=Agent_position[2]+dot(Agent_fomation[i],dical_mat)#dot定义矩阵乘法
                 
-                #----------------------------------------------------------
                 """
                 由于对tb3_2发送的angular指令为0,而且发送的linear.x=0.1,linear.y=linear.z=0,所以
                 Agent_theta[2,2]会随着时间的增大而减小,tb3_2会最终沿x轴行驶
                 """
                 
                 #定义ref_velo的初始值为0，表示小车的相对速度，实际上小车的相对速度
+                #ref_velo为ref_pos的导数,？
                 ref_velo=dot(Agent_fomation,
                              matrix([[-leader_w*sin(Agent_theta[2,2]),leader_w*cos(Agent_theta[2,2])],
                                     [-leader_w*cos(Agent_theta[2,2]),-leader_w*sin(Agent_theta[2,2])]]))
@@ -233,13 +242,13 @@ if __name__=="__main__":
                 ref_velo[0,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[0,1]
                 ref_velo[1,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[1,0]
                 ref_velo[1,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[1,1]
-                #target_xy_vel是如何定义的？
-                for j in range(3):#？把此处的循环注释掉不会影响编队行驶
+                for j in range(3):#保证生成预定的队形
                     if(j != i):
                         target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
-                #target_xy_vel设计原理？
-                #ref_velo[i]添加到/tb3_0、tb3_1，影响了小车的相对位置
+                
                 target_xy_vel[i]=ref_velo[i]-0.2*( Agent_position[i]-ref_position[i])+target_xy_vel[i]
+                #target_xy_vel设计原理为一致性编队编队跟踪，前两项为跟踪上虚拟参照，后一项为队形生成
+                #target_xy_vel表示控制器输出，为对x轴和y轴的速度控制量
         
             #----------------------------------------------------------------
             #对第一辆小车发布twist消息（对/tb3_0）
