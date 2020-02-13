@@ -52,7 +52,6 @@ import csv
 Agent_position=mat(zeros((3,2)))
 Agent_theta=mat(zeros((3,3)))
 Agent_p0 = mat(zeros((3, 3)))
-"""设定三个小车的初始位置"""
 Agent_fomation=matrix([[-0.5,0.3],
                         [-0.5,-0.3],
                         [0.0,0.0]])
@@ -128,6 +127,7 @@ def checkAngularLimitVelocity(vel):
       vel = constrain(vel, -BURGER_MAX_ANG_VEL, BURGER_MAX_ANG_VEL)
     return vel
 
+#获取小车的实际位置和角度
 def callback(data):
     global x_plot
     global y_plot
@@ -136,6 +136,7 @@ def callback(data):
     Agent_position[0,1]=data.pose.pose.position.y
     # x_plot = append(x_plot,Agent_position[0,0])
     # y_plot = append(y_plot,Agent_position[0,1])
+    #将姿态四元素转换为欧拉角
     Agent_theta[0]=tf.transformations.euler_from_quaternion([Agent_Quaternionn.x,Agent_Quaternionn.y,Agent_Quaternionn.z,Agent_Quaternionn.w])
 def callback1(data):
     Agent_Quaternionn=data.pose.pose.orientation
@@ -193,12 +194,14 @@ def control_output(x,y,theta,iden):
 
     # x+=x_avoid*0.1
     # y+=y_avoid*0.1
-    linear_c_vel=(math.cos(theta)*x+math.sin(theta)*y)
     # linear_c_vel=0.3*math.sqrt(math.pow(x, 2)+math.pow(y+0.1, 2))
     # angle_c_vel =3*angular_vel_judge(math.atan2(y+0.25,x)-theta)
+    #将对x轴和y轴的速度控制量转换为线速度和角速度
+    linear_c_vel=(math.cos(theta)*x+math.sin(theta)*y)
     angle_c_vel =6.66*(-1*math.sin(theta)*x+math.cos(theta)*y)
     return linear_c_vel,angle_c_vel
 
+#定义跟踪误差
 def distance_a1_a2(x1,x2):
     return sqrt(pow(x1[0,0]-x2[0,0],2)+pow(x1[0,1]-x2[0,1],2))
 
@@ -269,15 +272,16 @@ if __name__=="__main__":
         --------------------------------
     """
 
-    for i in range(3):     
+    for i in range(3):   #？  
         for j in range(3):
             Agent_p0[i,j]=0.75*distance_a1_a2(Agent_fomation[i],Agent_fomation[j])
     rospy.sleep(1)
     try:
         ros_rate=rospy.Rate(10)#里初始化一个Rate对象，通过后面的sleep()可以设定循环的频率，它的参数为10，我们期望每秒循环10次
-        begin=rospy.get_time()
+        begin=rospy.get_time()#初始时间
         while(not rospy.is_shutdown()):
             run_time=rospy.get_time()-begin
+            #设定/tb3_2的运动轨迹
             target_position[0,0]=1.5*cos(run_time*0.1)-1.5
             target_position[0,1]=1.5*sin(run_time*0.1)
             target_theta=run_time*0.1+1.5707
@@ -336,6 +340,7 @@ if __name__=="__main__":
             #this code is the control part
             twist = Twist()
             last_refer_position= ref_position.copy()
+            #一致性编队算法
             for i in range(3):
                 target_xy_vel[i]=[0.0,0.0]
                 dical_mat[0,0]=math.cos(target_theta)

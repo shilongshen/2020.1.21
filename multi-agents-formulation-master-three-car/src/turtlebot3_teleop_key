@@ -230,6 +230,7 @@ if __name__=="__main__":
                 """
                 由于对tb3_2发送的angular指令为0,而且发送的linear.x=0.1,linear.y=linear.z=0,所以
                 Agent_theta[2,2]会随着时间的增大而减小,tb3_2会最终沿x轴行驶
+                Agent_position[2]表示虚拟参照在物理坐标系的实际位置，在此处也表示为期望位置
                 """
                 
                 #定义ref_velo的初始值为0，表示小车的相对速度，实际上小车的相对速度
@@ -242,10 +243,16 @@ if __name__=="__main__":
                 ref_velo[0,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[0,1]
                 ref_velo[1,0]=leader_velo*math.cos(Agent_theta[2,2])+ref_velo[1,0]
                 ref_velo[1,1]=leader_velo*math.sin(Agent_theta[2,2])+ref_velo[1,1]
+                
                 for j in range(3):#保证生成预定的队形
                     if(j != i):
                         target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
-                
+                """
+                按照定义应该这样写
+                for j in range(3):
+                    #if(j != i):
+                    target_xy_vel[i]=+ad_mat[i,j]*0.1*((Agent_position[j]-Agent_position[2]-dot(Agent_fomation[j],dical_mat))-(Agent_position[i]-Agent_position[2]-dot(Agent_fomation[i],dical_mat)))+target_xy_vel[i]
+                """
                 target_xy_vel[i]=ref_velo[i]-0.2*( Agent_position[i]-ref_position[i])+target_xy_vel[i]
                 #target_xy_vel设计原理为一致性编队编队跟踪，前两项为跟踪上虚拟参照，后一项为队形生成
                 #target_xy_vel表示控制器输出，为对x轴和y轴的速度控制量
